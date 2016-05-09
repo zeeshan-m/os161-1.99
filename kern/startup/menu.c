@@ -505,6 +505,7 @@ static const char *mainmenu[] = {
 #endif /* UW */
 #endif
 	"[kh] Kernel heap stats              ",
+	"[dth] Enable DB_THREADS             ",
 	"[q] Quit and shut down              ",
 	NULL
 };
@@ -519,6 +520,18 @@ cmd_mainmenu(int n, char **a)
 	showmenu("OS/161 kernel menu", mainmenu);
 	return 0;
 }
+
+static
+int
+dthenable(int n, char **a)
+{
+	(void)n;
+	(void)a;
+
+	dbflags = DB_THREADS;
+	return 0;
+}
+
 
 ////////////////////////////////////////
 //
@@ -589,6 +602,8 @@ static struct {
 	{ "fs3",	writestress },
 	{ "fs4",	writestress2 },
 	{ "fs5",	createstress },
+
+	{ "dth",    dthenable },
 
 	{ NULL, NULL }
 };
