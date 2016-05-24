@@ -201,7 +201,7 @@ lock_acquire(struct lock *lock)
         wchan_sleep(lock->lock_wchan);
         spinlock_acquire(&lock->lock_lock);
     }
-    KASSERT(true == lock->locked);
+    KASSERT(false == lock->locked);
     KASSERT(NULL == lock->lock_holder);
     lock->locked = true;
     lock->lock_holder = curthread;
