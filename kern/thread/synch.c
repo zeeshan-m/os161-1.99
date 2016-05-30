@@ -182,7 +182,7 @@ lock_destroy(struct lock *lock)
     KASSERT(NULL != lock);
     KASSERT(false == lock->locked);
     KASSERT(NULL == lock->lock_holder);
-    kfree(lock->lock_wchan);
+    wchan_destroy(lock->lock_wchan);
     spinlock_cleanup(&lock->lock_lock);
     kfree(lock->lk_name);
     kfree(lock);
@@ -248,7 +248,12 @@ cv_create(const char *name)
         return NULL;
     }
 
-        // add stuff here as needed
+    cv->cv_wchan = wchan_create(cv->cv_name);
+    if (NULL == cv->cv_wchan) {
+        kfree(cv->cv_name);
+        kfree(cv);
+        return NULL;
+    }
 
     return cv;
 }
@@ -257,9 +262,7 @@ void
 cv_destroy(struct cv *cv)
 {
     KASSERT(cv != NULL);
-
-        // add stuff here as needed
-
+    wchan_destroy(cv->cv_wchan);
     kfree(cv->cv_name);
     kfree(cv);
 }
@@ -267,23 +270,23 @@ cv_destroy(struct cv *cv)
 void
 cv_wait(struct cv *cv, struct lock *lock)
 {
-        // Write this
-        (void)cv;    // suppress warning until code gets written
-        (void)lock;  // suppress warning until code gets written
-    }
+    lock_release(lock);
+    wchan_wakeone(cv->cv_wchan);
+    lock_acquire(lock);
+}
 
-    void
-    cv_signal(struct cv *cv, struct lock *lock)
-    {
-        // Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+void
+cv_signal(struct cv *cv, struct lock *lock)
+{
+    lock_release(lock);
+    wchan_wakeone(cv->cv_wchan);
+    lock_acquire(lock);
 }
 
 void
 cv_broadcast(struct cv *cv, struct lock *lock)
 {
-	// Write this
-	(void)cv;    // suppress warning until code gets written
-	(void)lock;  // suppress warning until code gets written
+    lock_release(lock);
+    wchan_wakeone(cv->cv_wchan);
+    lock_acquire(lock);
 }
