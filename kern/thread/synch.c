@@ -213,7 +213,7 @@ void
 lock_release(struct lock *lock)
 {
     KASSERT(NULL != lock);
-    KASSERT(lock_do_i_hold(lock));
+    KASSERT(true == lock_do_i_hold(lock));
     spinlock_acquire(&lock->lock_lock);
     lock->locked = false;
     lock->lock_holder = NULL;
