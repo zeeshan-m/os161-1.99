@@ -67,9 +67,8 @@ static volatile unsigned int proc_count;
 static struct semaphore *proc_count_mutex;
 /* used to signal the kernel menu thread when there are no processes */
 struct semaphore *no_proc_sem;   
+static pid_t curr_pid = 1;
 #endif  // UW
-
-
 
 /*
  * Create a proc structure.
@@ -101,6 +100,8 @@ proc_create(const char *name)
 
 #ifdef UW
 	proc->console = NULL;
+	proc->pid = curr_pid;
+	curr_pid++;
 #endif // UW
 
 	return proc;

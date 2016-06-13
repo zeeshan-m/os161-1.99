@@ -35,7 +35,7 @@
  *
  * Note: curproc is defined by <current.h>.
  */
-
+#include <types.h>
 #include <spinlock.h>
 #include <thread.h> /* required for struct threadarray */
 
@@ -67,7 +67,7 @@ struct proc {
      it has opened, not just the console. */
   struct vnode *console;                /* a vnode for the console device */
 #endif
-
+     pid_t pid;
 	/* add more material here as needed */
 };
 
