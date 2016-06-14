@@ -9,6 +9,42 @@
 #include <thread.h>
 #include <addrspace.h>
 #include <copyinout.h>
+#include <mips/trapframe.h>
+
+
+int sys_fork(struct trapframe *tf, pid_t *retval) {
+  struct proc *fork_proc = proc_create_runprogram(curproc->p_name);
+  DEBUG(DB_SYSCALL,"SysFork: fork_proc'd\n");
+  if(fork_proc == NULL) {
+    return ENPROC;
+  }
+
+  fork_proc->p_pid = curproc->pid;
+  as_copy(curproc_getas(), &(fork_proc->p_addrspace));
+  if(fork_proc->p_addrspace == NULL) {
+    proc_destroy(fork_proc);
+    return ENOMEM;
+  }
+  struct trapframe *forked_tf = kmalloc(sizeof(struct trapframe));
+  if(forked_tf == NULL) {
+    proc_destroy(fork_proc);
+    return ENOMEM;
+  }
+
+  memcpy(forked_tf, tf, sizeof(struct trapframe));
+  int errno = thread_fork(curthread->t_name, fork_proc, (void *)enter_forked_process, forked_tf, 0);
+  if (errno) {
+    proc_destroy(fork_proc);
+    kfree(forked_tf);
+    forked_tf = NULL;
+    return errno;
+  }
+
+  *retval = fork_proc->pid;
+
+  return 0;
+}
+
 
   /* this implementation of sys__exit does not do anything with the exit code */
   /* this needs to be fixed to get exit() and waitpid() working properly */
@@ -32,27 +68,27 @@ void sys__exit(int exitcode) {
    * half-destroyed address space. This tends to be
    * messily fatal.
    */
-  as = curproc_setas(NULL);
-  as_destroy(as);
+   as = curproc_setas(NULL);
+   as_destroy(as);
 
   /* detach this thread from its process */
   /* note: curproc cannot be used after this call */
-  proc_remthread(curthread);
+   proc_remthread(curthread);
 
   /* if this is the last user process in the system, proc_destroy()
      will wake up the kernel menu thread */
-  proc_destroy(p);
-  
-  thread_exit();
+   proc_destroy(p);
+
+   thread_exit();
   /* thread_exit() does not return, so we should never get here */
-  panic("return from thread_exit in sys_exit\n");
-}
+   panic("return from thread_exit in sys_exit\n");
+ }
 
 
 /* stub handler for getpid() system call                */
-int
-sys_getpid(pid_t *retval)
-{
+ int
+ sys_getpid(pid_t *retval)
+ {
   *retval = curproc->pid;
   return(curproc->pid);
 }
@@ -61,9 +97,9 @@ sys_getpid(pid_t *retval)
 
 int
 sys_waitpid(pid_t pid,
-	    userptr_t status,
-	    int options,
-	    pid_t *retval)
+ userptr_t status,
+ int options,
+ pid_t *retval)
 {
   int exitstatus;
   int result;
@@ -77,16 +113,16 @@ sys_waitpid(pid_t pid,
      Fix this!
   */
 
-  if (options != 0) {
-    return(EINVAL);
-  }
+     if (options != 0) {
+      return(EINVAL);
+    }
   /* for now, just pretend the exitstatus is 0 */
-  exitstatus = 0;
-  result = copyout((void *)&exitstatus,status,sizeof(int));
-  if (result) {
-    return(result);
+    exitstatus = 0;
+    result = copyout((void *)&exitstatus,status,sizeof(int));
+    if (result) {
+      return(result);
+    }
+    *retval = pid;
+    return(0);
   }
-  *retval = pid;
-  return(0);
-}
 

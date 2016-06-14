@@ -29,6 +29,7 @@
 
 #ifndef _SYSCALL_H_
 #define _SYSCALL_H_
+#include "opt-A2.h"
 
 
 struct trapframe; /* from <machine/trapframe.h> */
@@ -59,7 +60,11 @@ int sys_reboot(int code);
 int sys___time(userptr_t user_seconds, userptr_t user_nanoseconds);
 
 #ifdef UW
-int sys_fork(struct trapframe *tf, pid_t *retval);
+#if OPT_A2
+	int sys_fork(struct trapframe *tf, pid_t *retval);
+#else
+
+#endif /* OPT_A2 */
 int sys_write(int fdesc,userptr_t ubuf,unsigned int nbytes,int *retval);
 void sys__exit(int exitcode);
 int sys_getpid(pid_t *retval);

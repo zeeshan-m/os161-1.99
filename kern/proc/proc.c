@@ -50,6 +50,8 @@
 #include <vfs.h>
 #include <synch.h>
 #include <kern/fcntl.h>  
+#include <limits.h>
+#include <kern/errno.h>
 #include "opt-A2.h"
 
 /*
@@ -69,11 +71,39 @@ static struct semaphore *proc_count_mutex;
 /* used to signal the kernel menu thread when there are no processes */
 struct semaphore *no_proc_sem;   
 #if OPT_A2
-	static pid_t curr_pid = 1;
+	static pid_t curr_pid = -1;
+	static struct lock *pid_lock;
 #else
 
 #endif /* OPT_A2 */
 #endif  // UW
+
+#if OPT_A2
+pid_t generate_pid(void) {
+	bool test = pid_lock->locked;
+	DEBUG(DB_SYSCALL,"GenePID: curr_pid: (%d) %d\n",curr_pid, test);
+	if (! lock_do_i_hold(pid_lock)) {
+		lock_acquire(pid_lock);
+	}
+	while(curr_pid < PID_MIN) {
+		curr_pid++;
+	}
+	DEBUG(DB_SYSCALL,"GenPID: curr_pid: (%d)\n",curr_pid);
+	if(curr_pid <= PID_MAX) {
+		int result = curr_pid;
+		curr_pid++;
+		lock_release(pid_lock);
+		return result;
+	} else {
+		lock_release(pid_lock);
+		return ENPROC;
+	}
+}
+
+#else
+
+#endif /* OPT_A2 */
+
 
 /*
  * Create a proc structure.
@@ -106,8 +136,8 @@ proc_create(const char *name)
 #ifdef UW
 	proc->console = NULL;
 	#if OPT_A2
-		proc->pid = curr_pid;
-		curr_pid++;
+		//proc->pid = generate_pid();
+		proc->p_pid = -1;
 	#else
 
 	#endif /* OPT_A2 */
@@ -218,6 +248,15 @@ proc_bootstrap(void)
   if (no_proc_sem == NULL) {
     panic("could not create no_proc_sem semaphore\n");
   }
+	#if OPT_A2
+		pid_lock = lock_create("pid_lock");
+		  if(pid_lock == NULL) {
+		    panic("Could not create pid lock");
+		  }
+	#else
+
+	#endif /* OPT_A2 */
+
 #endif // UW 
 }
 
@@ -239,6 +278,9 @@ proc_create_runprogram(const char *name)
 	}
 
 #ifdef UW
+
+	// pid_lock
+	proc->pid = generate_pid();
 	/* open the console - this should always succeed */
 	console_path = kstrdup("con:");
 	if (console_path == NULL) {

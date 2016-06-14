@@ -70,6 +70,7 @@ struct proc {
 #endif
      #if OPT_A2
 		pid_t pid;
+		pid_t p_pid;
 	#else
 
 	#endif /* OPT_A2 */
@@ -84,6 +85,13 @@ extern struct proc *kproc;
 #ifdef UW
 extern struct semaphore *no_proc_sem;
 #endif // UW
+
+#if OPT_A2
+	pid_t generate_pid(void);
+#else
+
+#endif /* OPT_A2 */
+
 
 /* Call once during system startup to allocate data structures. */
 void proc_bootstrap(void);
