@@ -50,6 +50,7 @@
 #include <vfs.h>
 #include <synch.h>
 #include <kern/fcntl.h>  
+#include "opt-A2.h"
 
 /*
  * The process for the kernel; this holds all the kernel-only threads.
@@ -67,7 +68,11 @@ static volatile unsigned int proc_count;
 static struct semaphore *proc_count_mutex;
 /* used to signal the kernel menu thread when there are no processes */
 struct semaphore *no_proc_sem;   
-static pid_t curr_pid = 1;
+#if OPT_A2
+	static pid_t curr_pid = 1;
+#else
+
+#endif /* OPT_A2 */
 #endif  // UW
 
 /*
@@ -100,8 +105,13 @@ proc_create(const char *name)
 
 #ifdef UW
 	proc->console = NULL;
-	proc->pid = curr_pid;
-	curr_pid++;
+	#if OPT_A2
+		proc->pid = curr_pid;
+		curr_pid++;
+	#else
+
+	#endif /* OPT_A2 */
+
 #endif // UW
 
 	return proc;
