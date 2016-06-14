@@ -71,7 +71,7 @@ static struct semaphore *proc_count_mutex;
 /* used to signal the kernel menu thread when there are no processes */
 struct semaphore *no_proc_sem;   
 #if OPT_A2
-	static pid_t curr_pid = -1;
+	static pid_t curr_pid = PID_MIN;
 	static struct lock *pid_lock;
 #else
 
@@ -80,22 +80,11 @@ struct semaphore *no_proc_sem;
 
 #if OPT_A2
 pid_t generate_pid(void) {
-	bool test = pid_lock->locked;
-	DEBUG(DB_SYSCALL,"GenePID: curr_pid: (%d) %d\n",curr_pid, test);
-	if (! lock_do_i_hold(pid_lock)) {
-		lock_acquire(pid_lock);
-	}
-	while(curr_pid < PID_MIN) {
-		curr_pid++;
-	}
-	DEBUG(DB_SYSCALL,"GenPID: curr_pid: (%d)\n",curr_pid);
 	if(curr_pid <= PID_MAX) {
 		int result = curr_pid;
 		curr_pid++;
-		lock_release(pid_lock);
 		return result;
 	} else {
-		lock_release(pid_lock);
 		return ENPROC;
 	}
 }
@@ -136,7 +125,13 @@ proc_create(const char *name)
 #ifdef UW
 	proc->console = NULL;
 	#if OPT_A2
-		//proc->pid = generate_pid();
+		if (name == "[kernel]") {
+			proc->pid = generate_pid();
+		} else {
+			lock_acquire(pid_lock);
+			proc->pid = generate_pid();
+			lock_release(pid_lock);
+		}
 		proc->p_pid = -1;
 	#else
 
@@ -280,7 +275,9 @@ proc_create_runprogram(const char *name)
 #ifdef UW
 
 	// pid_lock
+	lock_acquire(pid_lock);
 	proc->pid = generate_pid();
+	lock_release(pid_lock);
 	/* open the console - this should always succeed */
 	console_path = kstrdup("con:");
 	if (console_path == NULL) {
