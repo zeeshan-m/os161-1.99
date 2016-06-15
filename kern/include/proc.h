@@ -71,6 +71,7 @@ struct proc {
     #if OPT_A2
 		pid_t pid;
 		pid_t p_pid;
+		struct cv *proc_cv;
 	#else
 
 	#endif /* OPT_A2 */
@@ -79,16 +80,18 @@ struct proc {
 };
 
 #if OPT_A2
-struct proc_end_code {
+struct proc_status {
 	pid_t pid;
+	int status; // 1 running, 0 exited
 	int exit_code;
 };
-struct array *all_exit_codes;
+struct array *all_proc_status;
 
 int  index_in_exit_array(pid_t pid);
 void store_exit_code(int exit_code, pid_t pid);
 int  get_exit_code(pid_t pid);
-struct lock *all_exit_codes_lock;
+struct lock *all_proc_status_lock;
+struct lock *wake_up_lock;
 #else
 
 #endif /* OPT_A2 */
