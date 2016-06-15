@@ -89,6 +89,33 @@ pid_t generate_pid(void) {
 	}
 }
 
+int index_in_exit_array(pid_t pid) {
+	for(unsigned int x = 0; x < array_num(all_exit_codes); x++) {
+		struct proc_end_code *curr = array_get(all_exit_codes, x);
+		if(curr->pid == pid) {
+			return x;
+		}
+	}
+	return -1;
+}
+
+void store_exit_code(int exit_code, pid_t pid) {
+	int index = index_in_exit_array(pid);
+	KASSERT(index == -1);
+	struct proc_end_code *new_entry = kmalloc(sizeof(struct proc_end_code));
+	new_entry->pid = pid;
+	new_entry->exit_code = exit_code;
+	lock_acquire(all_exit_codes_lock);
+	array_add(all_exit_codes, new_entry, NULL);
+	lock_release(all_exit_codes_lock);
+}
+
+int get_exit_code(pid_t pid) {
+	int index = index_in_exit_array(pid);
+	KASSERT(index == -1);
+	return array_get(all_exit_codes, index);
+}
+
 #else
 
 #endif /* OPT_A2 */
@@ -245,9 +272,15 @@ proc_bootstrap(void)
   }
 	#if OPT_A2
 		pid_lock = lock_create("pid_lock");
-		  if(pid_lock == NULL) {
-		    panic("Could not create pid lock");
-		  }
+		if(pid_lock == NULL) {
+			panic("Could not create pid lock");
+		}
+		all_exit_codes_lock = lock_create("exit_code_lock");
+		if(all_exit_codes_lock == NULL) {
+			panic("Could not create exit code lock");
+		}
+		all_exit_codes = array_create();
+		array_init(all_exit_codes);
 	#else
 
 	#endif /* OPT_A2 */

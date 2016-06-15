@@ -68,7 +68,7 @@ struct proc {
      it has opened, not just the console. */
   struct vnode *console;                /* a vnode for the console device */
 #endif
-     #if OPT_A2
+    #if OPT_A2
 		pid_t pid;
 		pid_t p_pid;
 	#else
@@ -77,6 +77,21 @@ struct proc {
      
 	/* add more material here as needed */
 };
+
+#if OPT_A2
+struct proc_end_code {
+	pid_t pid;
+	int exit_code;
+};
+struct array *all_exit_codes;
+
+int  index_in_exit_array(pid_t pid);
+void store_exit_code(int exit_code, pid_t pid);
+int  get_exit_code(pid_t pid);
+struct lock *all_exit_codes_lock;
+#else
+
+#endif /* OPT_A2 */
 
 /* This is the process structure for the kernel and for kernel-only threads. */
 extern struct proc *kproc;
