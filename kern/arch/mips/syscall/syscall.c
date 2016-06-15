@@ -188,10 +188,9 @@ syscall(struct trapframe *tf)
 void
 enter_forked_process(struct trapframe *tf)
 {
-	tf->tf_v0 = 0;
-	tf->tf_a3 = 0;
-	tf->tf_epc = 0;
-	KASSERT(curthread->t_curspl == 0);
-	KASSERT(curthread->t_iplhigh_count == 0);
-	mips_usermode(tf);
+	struct trapframe fork_tf = *tf;
+	fork_tf.tf_v0 = 0;
+	fork_tf.tf_a3 = 0;
+	fork_tf.tf_epc += 4;
+	mips_usermode(&fork_tf);
 }

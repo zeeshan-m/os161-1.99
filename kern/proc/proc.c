@@ -273,11 +273,7 @@ proc_create_runprogram(const char *name)
 	}
 
 #ifdef UW
-
-	// pid_lock
-	lock_acquire(pid_lock);
-	proc->pid = generate_pid();
-	lock_release(pid_lock);
+	proc->p_pid = -1;
 	/* open the console - this should always succeed */
 	console_path = kstrdup("con:");
 	if (console_path == NULL) {

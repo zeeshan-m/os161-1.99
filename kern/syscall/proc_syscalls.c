@@ -14,7 +14,6 @@
 
 int sys_fork(struct trapframe *tf, pid_t *retval) {
   struct proc *fork_proc = proc_create_runprogram(curproc->p_name);
-  DEBUG(DB_SYSCALL,"SysFork: fork_proc'd\n");
   if(fork_proc == NULL) {
     return ENPROC;
   }
@@ -25,6 +24,7 @@ int sys_fork(struct trapframe *tf, pid_t *retval) {
     proc_destroy(fork_proc);
     return ENOMEM;
   }
+
   struct trapframe *forked_tf = kmalloc(sizeof(struct trapframe));
   if(forked_tf == NULL) {
     proc_destroy(fork_proc);
