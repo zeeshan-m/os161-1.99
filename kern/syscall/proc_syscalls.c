@@ -10,7 +10,6 @@
 #include <addrspace.h>
 #include <copyinout.h>
 #include <mips/trapframe.h>
-#include <synch.h>
 
 
 int sys_fork(struct trapframe *tf, pid_t *retval) {
@@ -54,9 +53,10 @@ void sys__exit(int exitcode) {
 
   struct addrspace *as;
   struct proc *p = curproc;
+  /* for now, just include this to keep the compiler from complaining about
+     an unused variable */
 
   store_exit_code(exitcode, p->pid);
-  cv_broadcast(p->proc_cv, wake_up_lock);
   DEBUG(DB_SYSCALL,"Syscall: _exit(%d)\n",exitcode);
 
   KASSERT(curproc->p_addrspace != NULL);
@@ -117,20 +117,7 @@ sys_waitpid(pid_t pid,
       return(EINVAL);
     }
   /* for now, just pretend the exitstatus is 0 */
-
-    lock_acquire(all_proc_status_lock);
-    int index = index_in_exit_array(pid);
-    if(index == -1) {
-      return ESRCH;
-    }
-    struct proc_status *pid_entry = array_get(all_proc_status, index);
-
-    while(pid_entry->status == 1) {
-      cv_wait(pid_entry->proc_cv, all_proc_status_lock);
-    }
-    exitstatus = pid_entry->exit_code;
-    lock_release(all_proc_status_lock);
-
+    exitstatus = 0;
     result = copyout((void *)&exitstatus,status,sizeof(int));
     if (result) {
       return(result);

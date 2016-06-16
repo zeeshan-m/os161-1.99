@@ -90,8 +90,8 @@ pid_t generate_pid(void) {
 }
 
 int index_in_exit_array(pid_t pid) {
-	for(unsigned int x = 0; x < array_num(all_proc_status); x++) {
-		struct proc_status *curr = array_get(all_proc_status, x);
+	for(unsigned int x = 0; x < array_num(all_exit_codes); x++) {
+		struct proc_end_code *curr = array_get(all_exit_codes, x);
 		if(curr->pid == pid) {
 			return x;
 		}
@@ -102,19 +102,18 @@ int index_in_exit_array(pid_t pid) {
 void store_exit_code(int exit_code, pid_t pid) {
 	int index = index_in_exit_array(pid);
 	KASSERT(index == -1);
-	struct proc_status *new_entry = kmalloc(sizeof(struct proc_status));
+	struct proc_end_code *new_entry = kmalloc(sizeof(struct proc_end_code));
 	new_entry->pid = pid;
 	new_entry->exit_code = exit_code;
-	lock_acquire(all_proc_status_lock);
-	array_add(all_proc_status, new_entry, NULL);
-	lock_release(all_proc_status_lock);
+	lock_acquire(all_exit_codes_lock);
+	array_add(all_exit_codes, new_entry, NULL);
+	lock_release(all_exit_codes_lock);
 }
 
 int get_exit_code(pid_t pid) {
 	int index = index_in_exit_array(pid);
 	KASSERT(index == -1);
-	struct proc_status *pid_entry = array_get(all_proc_status, index);
-	return pid_entry->exit_code;
+	return array_get(all_exit_codes, index);
 }
 
 #else
@@ -161,11 +160,6 @@ proc_create(const char *name)
 			lock_release(pid_lock);
 		}
 		proc->p_pid = -1;
-
-		proc->proc_cv = cv_create("proc cv");
-		if(proc->proc_cv == NULL) {
-			panic("Could not create proc cv");
-		}
 	#else
 
 	#endif /* OPT_A2 */
@@ -281,18 +275,12 @@ proc_bootstrap(void)
 		if(pid_lock == NULL) {
 			panic("Could not create pid lock");
 		}
-		all_proc_status_lock = lock_create("exit_code_lock");
-		if(all_proc_status_lock == NULL) {
+		all_exit_codes_lock = lock_create("exit_code_lock");
+		if(all_exit_codes_lock == NULL) {
 			panic("Could not create exit code lock");
 		}
-		all_proc_status = array_create();
-		array_init(all_proc_status);
-
-		wake_up_lock = lock_create("wake_up_lock");
-		if(wake_up_lock == NULL) {
-			panic("Could not create wake_up_lock");
-		}
-
+		all_exit_codes = array_create();
+		array_init(all_exit_codes);
 	#else
 
 	#endif /* OPT_A2 */
