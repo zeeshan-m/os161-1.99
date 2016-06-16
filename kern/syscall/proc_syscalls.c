@@ -10,7 +10,7 @@
 #include <addrspace.h>
 #include <copyinout.h>
 #include <mips/trapframe.h>
-
+#include <synch.h>
 
 int sys_fork(struct trapframe *tf, pid_t *retval) {
   struct proc *fork_proc = proc_create_runprogram(curproc->p_name);
@@ -19,6 +19,7 @@ int sys_fork(struct trapframe *tf, pid_t *retval) {
   }
 
   fork_proc->p_pid = curproc->pid;
+
   as_copy(curproc_getas(), &(fork_proc->p_addrspace));
   if(fork_proc->p_addrspace == NULL) {
     proc_destroy(fork_proc);
@@ -39,7 +40,7 @@ int sys_fork(struct trapframe *tf, pid_t *retval) {
     forked_tf = NULL;
     return errno;
   }
-
+  update_proc_parent_pid(fork_proc->pid, curproc->pid);
   *retval = fork_proc->pid;
 
   return 0;
@@ -55,7 +56,7 @@ void sys__exit(int exitcode) {
   struct proc *p = curproc;
   /* for now, just include this to keep the compiler from complaining about
      an unused variable */
-  (void)exitcode;
+  save_exit_code(p->pid, exitcode);
 
   DEBUG(DB_SYSCALL,"Syscall: _exit(%d)\n",exitcode);
 
@@ -90,7 +91,7 @@ void sys__exit(int exitcode) {
  sys_getpid(pid_t *retval)
  {
   *retval = curproc->pid;
-  return(curproc->pid);
+  return(0);
 }
 
 /* stub handler for waitpid() system call                */
@@ -116,8 +117,22 @@ sys_waitpid(pid_t pid,
      if (options != 0) {
       return(EINVAL);
     }
+    lock_acquire(all_procs_lock);
+    struct proc_status* curr = get_proc_status(pid);
+    if(curr->p_pid != curproc->pid) {
+      return ECHILD;
+    } else if (curr == NULL) {
+      return ESRCH;
+    }
+
+    while(curr->status != 0) {
+      cv_wait(proc_cv, all_procs_lock);
+    }
+    exitstatus = curr->exit_code;
+    lock_release(all_procs_lock);
+
   /* for now, just pretend the exitstatus is 0 */
-    exitstatus = 0;
+    
     result = copyout((void *)&exitstatus,status,sizeof(int));
     if (result) {
       return(result);

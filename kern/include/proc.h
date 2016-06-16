@@ -87,7 +87,22 @@ extern struct semaphore *no_proc_sem;
 #endif // UW
 
 #if OPT_A2
+	struct proc_status {
+		pid_t pid;
+		pid_t p_pid;
+		int exit_code;
+		int status;
+	};
+	struct array *all_procs;
+	struct lock *all_procs_lock;
+	struct cv *proc_cv;
 	pid_t generate_pid(void);
+	void new_proc_to_proc_array(pid_t pid, const char *name);
+	int proc_index_in_proc_array(pid_t pid);
+	struct proc_status* get_proc_status(pid_t pid);
+	void update_proc_parent_pid(pid_t pid, pid_t p_pid);
+	void orphan_children(pid_t pid);
+	void save_exit_code(pid_t pid, int exit_code);
 #else
 
 #endif /* OPT_A2 */

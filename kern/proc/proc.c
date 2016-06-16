@@ -53,7 +53,7 @@
 #include <limits.h>
 #include <kern/errno.h>
 #include "opt-A2.h"
-
+#include <kern/wait.h>
 /*
  * The process for the kernel; this holds all the kernel-only threads.
  */
@@ -87,6 +87,71 @@ pid_t generate_pid(void) {
 	} else {
 		return ENPROC;
 	}
+}
+
+void new_proc_to_proc_array(pid_t pid, const char *name) {
+	struct proc_status* curr = kmalloc(sizeof(struct proc_status));
+	curr->pid = pid;
+	curr->p_pid = -1;
+	curr->status = 1;
+	if(name == "[kernel]") {
+		array_add(all_procs, curr, NULL);
+	} else {
+		lock_acquire(all_procs_lock);
+		array_add(all_procs, curr, NULL);
+		lock_release(all_procs_lock);
+	}
+	return;
+}
+
+int proc_index_in_proc_array(pid_t pid) {
+	for(unsigned int x = 0; x < array_num(all_procs); x++) {
+		struct proc_status *curr = array_get(all_procs, x);
+		if(curr->pid == pid) {
+			return x;
+		}
+	}
+	return -1;
+}
+
+struct proc_status* get_proc_status(pid_t pid) {
+	int index = proc_index_in_proc_array(pid);
+	if(index == -1) {
+		return NULL;
+	} else {
+		return array_get(all_procs, index);
+	}
+}
+
+void update_proc_parent_pid(pid_t pid, pid_t p_pid) {
+	lock_acquire(all_procs_lock);
+	struct proc_status* curr = get_proc_status(pid);
+	curr->p_pid = p_pid;
+	lock_release(all_procs_lock);
+	return;
+}
+
+// Assumes lock already is acquired
+void orphan_children(pid_t pid) {
+	for(unsigned int x = 0; x < array_num(all_procs); x++) {
+		struct proc_status *curr = array_get(all_procs, x);
+		if(curr->p_pid == pid) {
+			curr->p_pid = -1;
+		}
+	}
+}
+
+void save_exit_code(pid_t pid, int exit_code) {
+	lock_acquire(all_procs_lock);
+	struct proc_status* curr = get_proc_status(pid);
+	curr->exit_code = _MKWAIT_EXIT(exit_code);
+	curr->status = 0;
+	if(curr->p_pid == -1) {
+		orphan_children(pid);
+		cv_broadcast(proc_cv, all_procs_lock);
+	}
+	lock_release(all_procs_lock);
+	return;
 }
 
 #else
@@ -133,6 +198,7 @@ proc_create(const char *name)
 			lock_release(pid_lock);
 		}
 		proc->p_pid = -1;
+		new_proc_to_proc_array(proc->pid, name);
 	#else
 
 	#endif /* OPT_A2 */
@@ -229,6 +295,12 @@ proc_destroy(struct proc *proc)
 void
 proc_bootstrap(void)
 {
+#if OPT_A2
+	all_procs = array_create(); // MUST be made before proc_create is called
+	array_init(all_procs);
+#else
+#endif /* OPT_A2 */
+
   kproc = proc_create("[kernel]");
   if (kproc == NULL) {
     panic("proc_create for kproc failed\n");
@@ -245,9 +317,17 @@ proc_bootstrap(void)
   }
 	#if OPT_A2
 		pid_lock = lock_create("pid_lock");
-		  if(pid_lock == NULL) {
-		    panic("Could not create pid lock");
-		  }
+		if(pid_lock == NULL) {
+			panic("Could not create pid lock");
+		}
+		all_procs_lock = lock_create("all_procs_lock");
+		if(all_procs_lock == NULL) {
+			panic("Could not create all_procs_lock");
+		}
+		proc_cv = cv_create("proc_cv");
+		if (proc_cv == NULL) {
+			panic("Could not create proc_cv");
+		}
 	#else
 
 	#endif /* OPT_A2 */
