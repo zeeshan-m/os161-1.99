@@ -44,7 +44,9 @@
 #include <vfs.h>
 #include <syscall.h>
 #include <test.h>
-
+#include <limits.h>
+#include <copyinout.h>
+#include "opt-A2.h"
 /*
  * Load program "progname" and start running it in usermode.
  * Does not return except on error.
@@ -52,7 +54,7 @@
  * Calls vfs_open on progname and thus may destroy it.
  */
 int
-runprogram(char *progname)
+runprogram(char *progname, char **args)
 {
 	struct addrspace *as;
 	struct vnode *v;
@@ -70,7 +72,7 @@ runprogram(char *progname)
 
 	/* Create a new address space. */
 	as = as_create();
-	if (as ==NULL) {
+	if (as == NULL) {
 		vfs_close(v);
 		return ENOMEM;
 	}
@@ -97,9 +99,50 @@ runprogram(char *progname)
 		return result;
 	}
 
-	/* Warp to user mode. */
-	enter_new_process(0 /*argc*/, NULL /*userspace addr of argv*/,
-			  stackptr, entrypoint);
+	#if OPT_A2
+	    int arg_count = 0;
+	    while(args[arg_count] != NULL) {
+	      if(strlen(args[arg_count]) >= 1025) {
+	        return E2BIG;
+	      }
+	      arg_count += 1;
+	    }
+	    if(arg_count > ARG_MAX) {
+	      return E2BIG;
+	    }
+
+	    while((stackptr % 8) != 0) {
+	      stackptr -= 1;
+	    }
+	    vaddr_t args_pointer[arg_count + 1];
+	    for(int i = arg_count - 1; i >= 0; i--) {
+	      stackptr -= strlen(args[i]) + 1;
+
+	      int curr_res = copyoutstr(args[i], (userptr_t) stackptr, strlen(args[i]) + 1, NULL);
+	      if(curr_res != 0) {
+	        return curr_res;
+	      }
+	      args_pointer[i] = stackptr;
+	    }
+
+	    while((stackptr % 4) != 0) {
+	      stackptr -= 1;
+	    }
+
+	    args_pointer[arg_count] = 0;
+	    for(int i = arg_count; i >= 0; i--) {
+	      stackptr -= ROUNDUP(sizeof(vaddr_t), 4);
+	      int curr_res = copyout(&args_pointer[i], (userptr_t) stackptr, sizeof(vaddr_t));
+	      if(curr_res != 0) {
+	        return curr_res;
+	      }
+	    }
+		enter_new_process(arg_count /*argc*/, (userptr_t) stackptr /*userspace addr of argv*/,
+				  stackptr, entrypoint);	    
+	#else
+		enter_new_process(0 /*argc*/, (userptr_t) stackptr /*userspace addr of argv*/,
+				  stackptr, entrypoint);
+	#endif /* OPT_A2 */
 	
 	/* enter_new_process does not return. */
 	panic("enter_new_process returned\n");
